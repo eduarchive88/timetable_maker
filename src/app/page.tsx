@@ -18,6 +18,7 @@ export default function Home() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [warningMsg, setWarningMsg] = useState<string | null>(null);
   const [result, setResult] = useState<any>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, key: string) => {
@@ -60,6 +61,7 @@ export default function Home() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setWarningMsg(null);
     setResult(null);
     
     if (!files.teacher_file || !files.g2_file || !files.g3_file || !files.group_file) {
@@ -84,6 +86,9 @@ export default function Home() {
       const data = await res.json();
       if (!res.ok || data.status === 'error') {
         setError(data.message || '시간표 생성 중 오류가 발생했습니다.');
+      } else if (data.status === 'warning') {
+        setWarningMsg(data.message);
+        setResult(data);
       } else {
         setResult(data);
       }
@@ -211,11 +216,22 @@ export default function Home() {
             </div>
           )}
 
+          {warningMsg && (
+            <div className="error-card" style={{ background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)' }}>
+              <h3 style={{ color: '#fbbf24' }}>⚠️ 시간표 충돌 경고</h3>
+              <p style={{ whiteSpace: 'pre-wrap', lineHeight: '1.6', color: '#fcd34d' }}>{warningMsg}</p>
+            </div>
+          )}
+
           {result && (
-            <div className="glass-panel result-section">
-              <h2 style={{ color: '#10b981', marginBottom: '1rem' }}>🎉 생성 완료!</h2>
+            <div className="glass-panel result-section" style={{ marginTop: warningMsg ? '1rem' : '0' }}>
+              <h2 style={{ color: warningMsg ? '#fbbf24' : '#10b981', marginBottom: '1rem' }}>
+                {warningMsg ? '⚠️ 충돌 상태로 생성 완료' : '🎉 생성 완료!'}
+              </h2>
               <p style={{ marginBottom: '1.5rem', color: 'var(--text-muted)' }}>
-                성공적으로 모든 시간표 배정이 완료되었습니다. 교사별/학생별 시간표를 엑셀로 다운로드하여 확인하세요.
+                {warningMsg 
+                  ? '동선이 겹치는 부분이 존재하지만 강제로 시간표를 생성했습니다. 다운로드한 엑셀 파일에서 붉은색으로 칠해진 충돌 셀을 확인하세요.' 
+                  : '성공적으로 모든 시간표 배정이 완료되었습니다. 교사별/학생별 시간표를 엑셀로 다운로드하여 확인하세요.'}
               </p>
               
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>

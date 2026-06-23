@@ -221,6 +221,36 @@ def run_diagnostic_solver(homeroom_classes, blocks, teachers, grades_classes, ti
     status = solver.Solve(model)
     
     if status == cp_model.OPTIMAL or status == cp_model.FEASIBLE:
+        schedule = []
+        for i, hc in enumerate(homeroom_classes):
+            for ts in timeslots:
+                if solver.Value(x[f"HR_{i}", ts]):
+                    day, period = ts.split('_')
+                    schedule.append({
+                        'type': 'homeroom',
+                        'grade': hc['grade'],
+                        'class_col': hc['class_col'],
+                        'teacher': hc['teacher'],
+                        'subject': hc['subject'],
+                        'day': day,
+                        'period': int(period)
+                    })
+        for b_key, block in blocks.items():
+            for ts in timeslots:
+                if solver.Value(x[b_key, ts]):
+                    day, period = ts.split('_')
+                    for c in block['classes']:
+                        schedule.append({
+                            'type': 'moving_group',
+                            'grade': block['grade'],
+                            'group': block['group'],
+                            'class_col': c['class_col'],
+                            'teacher': c['teacher'],
+                            'subject': c['subject'],
+                            'day': day,
+                            'period': int(period)
+                        })
+
         bottleneck_msgs = []
         for (teacher, ts), ov_var in overlap_vars_t.items():
             if solver.Value(ov_var) > 0:
@@ -234,10 +264,12 @@ def run_diagnostic_solver(homeroom_classes, blocks, teachers, grades_classes, ti
                 
         if bottleneck_msgs:
             unique_msgs = list(set(bottleneck_msgs))
-            msg = "🚨 시간표 생성 병목 지점 발견!\n\n" + "\n\n".join(unique_msgs[:5])
+            msg = "🚨 시간표가 생성되었으나, 일부 시간표 동선이 겹치는 부분이 있습니다!\n\n" + "\n\n".join(unique_msgs[:5])
             if len(unique_msgs) > 5:
                 msg += f"\n\n...외 {len(unique_msgs)-5}건의 숨겨진 충돌이 더 있습니다."
-            return {"status": "error", "message": msg}
+            return {"status": "warning", "message": msg, "schedule": schedule}
+            
+        return {"status": "success", "schedule": schedule}
             
     return {"status": "error", "message": "시간표 생성이 불가능합니다. 복합적인 동선 충돌이 발생했습니다. 여러 교사의 시수와 이동그룹을 전체적으로 점검해주세요."}
 

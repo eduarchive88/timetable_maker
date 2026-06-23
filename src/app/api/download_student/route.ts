@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import * as xlsx from 'xlsx';
+import ExcelJS from 'exceljs';
 
 export async function POST(req: NextRequest) {
   try {
@@ -12,9 +12,8 @@ export async function POST(req: NextRequest) {
     const days = ['월', '화', '수', '목', '금'];
     const maxPeriod = Math.max(...Object.values(periods as Record<string, number>));
 
-    const wb = xlsx.utils.book_new();
+    const workbook = new ExcelJS.Workbook();
 
-    // Group students by grade and class
     const classGroups: Record<string, any[]> = {};
     for (const st of students) {
       const key = `${st.grade}학년 ${st.class_col}반`;
@@ -23,38 +22,64 @@ export async function POST(req: NextRequest) {
     }
 
     for (const [className, classStudents] of Object.entries(classGroups)) {
-      // Sort students by ID
       classStudents.sort((a, b) => a.student_id.localeCompare(b.student_id));
+      
+      const ws = workbook.addWorksheet(className.replace(/ /g, '_'));
+      
+      // Default col widths
+      ws.getColumn(1).width = 8;
+      for(let i=2; i<=6; i++) ws.getColumn(i).width = 20;
 
-      const sheetData: any[][] = [];
+      let currentRow = 1;
 
       for (const st of classStudents) {
-        // Title for the student
-        sheetData.push([`[${st.student_id}] ${st.name} 개인 시간표`]);
+        // Title
+        const titleRow = ws.getRow(currentRow);
+        titleRow.getCell(1).value = `[${st.student_id}] ${st.name} 개인 시간표`;
+        titleRow.font = { bold: true, size: 12 };
+        ws.mergeCells(currentRow, 1, currentRow, 6);
+        currentRow++;
         
         // Header
-        const header = ['교시', ...days];
-        sheetData.push(header);
-
-        // Build the grid
-        const grid: string[][] = Array.from({ length: maxPeriod }, () => Array(days.length).fill(''));
-
-        // Fill homeroom classes
-        const hrClasses = schedule.filter((s: any) => 
-          s.type === 'homeroom' && s.grade == st.grade && String(s.class_col) == String(st.class_col)
-        );
-        for (const s of hrClasses) {
-          const dIdx = days.indexOf(s.day);
-          const pIdx = s.period - 1;
-          if (dIdx >= 0 && pIdx >= 0 && pIdx < maxPeriod) {
-            grid[pIdx][dIdx] = `${s.subject}\n(${s.teacher})`;
-          }
+        const headerRow = ws.getRow(currentRow);
+        headerRow.values = ['교시', ...days];
+        headerRow.font = { bold: true };
+        headerRow.alignment = { horizontal: 'center' };
+        // set borders
+        for(let i=1; i<=6; i++) {
+            headerRow.getCell(i).border = { top: {style:'thin'}, bottom:{style:'thin'}, left:{style:'thin'}, right:{style:'thin'} };
         }
+        currentRow++;
 
-        // Fill moving group classes
+        // Grid
+        const grid: {text: string, isCollision: boolean}[][] = Array.from({ length: maxPeriod }, () => 
+            Array(days.length).fill({text:'', isCollision: false})
+        );
+
+        const fillGrid = (s: any) => {
+            const dIdx = days.indexOf(s.day);
+            const pIdx = s.period - 1;
+            if (dIdx >= 0 && pIdx >= 0 && pIdx < maxPeriod) {
+                const current = grid[pIdx][dIdx];
+                const newText = `${s.subject}\n(${s.teacher})`;
+                if (current && current.text) {
+                    grid[pIdx][dIdx] = {
+                        text: `[충돌]\n${current.text}\n---\n${newText}`,
+                        isCollision: true
+                    };
+                } else {
+                    grid[pIdx][dIdx] = {
+                        text: newText,
+                        isCollision: false
+                    };
+                }
+            }
+        };
+
+        const hrClasses = schedule.filter((s: any) => s.type === 'homeroom' && s.grade == st.grade && String(s.class_col) == String(st.class_col));
+        for (const s of hrClasses) fillGrid(s);
+
         for (const sel of st.selections) {
-          // sel looks like "A_사회와 문화_1반"
-          // We parse it back
           const match = sel.match(/^([A-Z][0-9]?)_(.+)_([0-9]+)반$/);
           if (match) {
             const grp = match[1];
@@ -66,39 +91,39 @@ export async function POST(req: NextRequest) {
               s.group === grp && s.subject === sub && String(s.class_col) === cls
             );
             
-            for (const s of mgClasses) {
-              const dIdx = days.indexOf(s.day);
-              const pIdx = s.period - 1;
-              if (dIdx >= 0 && pIdx >= 0 && pIdx < maxPeriod) {
-                grid[pIdx][dIdx] = `${s.subject}\n(${s.teacher})`;
-              }
-            }
+            for (const s of mgClasses) fillGrid(s);
           }
         }
 
-        // Add grid to sheet data
+        // Write grid to worksheet
         for (let p = 0; p < maxPeriod; p++) {
-          sheetData.push([`${p + 1}교시`, ...grid[p]]);
+          const row = ws.getRow(currentRow);
+          row.height = 45; // taller rows
+          row.getCell(1).value = `${p + 1}교시`;
+          row.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+          row.getCell(1).border = { top: {style:'thin'}, bottom:{style:'thin'}, left:{style:'thin'}, right:{style:'thin'} };
+
+          for (let d = 0; d < days.length; d++) {
+             const cell = row.getCell(d + 2);
+             cell.value = grid[p][d] ? grid[p][d].text : '';
+             cell.alignment = { wrapText: true, horizontal: 'center', vertical: 'middle' };
+             cell.border = { top: {style:'thin'}, bottom:{style:'thin'}, left:{style:'thin'}, right:{style:'thin'} };
+             
+             if (grid[p][d] && grid[p][d].isCollision) {
+                 cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFC7CE' } };
+                 cell.font = { color: { argb: 'FF9C0006' }, bold: true };
+             }
+          }
+          currentRow++;
         }
         
-        // Empty row separator
-        sheetData.push([]);
-        sheetData.push([]);
+        currentRow += 2; // spacing between students
       }
-
-      const ws = xlsx.utils.aoa_to_sheet(sheetData);
-      
-      // Auto size columns roughly
-      const wscols = [{ wch: 6 }]; // 교시
-      for (let i = 0; i < days.length; i++) wscols.push({ wch: 18 });
-      ws['!cols'] = wscols;
-
-      xlsx.utils.book_append_sheet(wb, ws, className.replace(/ /g, '_'));
     }
 
-    const excelBuffer = xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    const buffer = await workbook.xlsx.writeBuffer();
 
-    return new NextResponse(excelBuffer, {
+    return new NextResponse(buffer, {
       status: 200,
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
