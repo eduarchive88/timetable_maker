@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: '지능형 시간표 생성기',
+  title: '고교학점제 맞춤형 시간표 생성기',
   description: '경기도 지구과학 교사 뀨짱이 만든 OR-Tools 기반 고등학교 시간표 생성기',
 }
 

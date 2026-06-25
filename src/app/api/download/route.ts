@@ -27,34 +27,56 @@ export async function POST(req: NextRequest) {
     for (const teacher of teachers) {
       const teacherSchedule = schedule.filter((s: any) => s.teacher === teacher);
       
-      const rowData: any[] = [teacher];
+      const rowData: any[] = [`${teacher}(${teacherSchedule.length})`];
       let colIdx = 2;
       
-      const cellStyles: { col: number, isCollision: boolean, text: string }[] = [];
+      const cellStyles: { col: number, isCollision: boolean, text: string, group?: string }[] = [];
 
       for (const day of days) {
         for (let p = 1; p <= periods[day]; p++) {
           const classes = teacherSchedule.filter((s: any) => s.day === day && s.period === p);
           let cellText = '';
           let isCollision = false;
+          let groupStr = '';
 
           if (classes.length > 0) {
-            const lines = classes.map((s: any) => `${s.grade}-${s.class_col} ${s.subject}`).join('\n');
+            const lines = classes.map((s: any) => {
+              if (s.type === 'moving_group') {
+                return `${s.grade}-${s.class_col} ${s.subject} [${s.group}]`;
+              }
+              return `${s.grade}-${s.class_col} ${s.subject}`;
+            }).join('\n');
+            
             if (classes.length > 1) {
               cellText = `[충돌]\n${lines}`;
               isCollision = true;
             } else {
               cellText = lines;
+              if (classes[0].type === 'moving_group') {
+                 groupStr = classes[0].group ? classes[0].group[0] : 'A';
+              }
             }
           }
           rowData.push(cellText);
-          cellStyles.push({ col: colIdx, isCollision, text: cellText });
+          cellStyles.push({ col: colIdx, isCollision, text: cellText, group: groupStr });
           colIdx++;
         }
       }
       
       const addedRow = worksheet.addRow(rowData);
-      addedRow.height = 30; // make row taller for multi-line
+      
+      let maxLines = 1;
+      for (const style of cellStyles) {
+         if (style.text) {
+             let physicalLines = 0;
+             const lines = style.text.split('\n');
+             for (const line of lines) {
+                 physicalLines += Math.max(1, Math.ceil(line.length / 8));
+             }
+             if (physicalLines > maxLines) maxLines = physicalLines;
+         }
+      }
+      addedRow.height = Math.max(45, maxLines * 26 + 15);
       
       // Apply styles
       cellStyles.forEach(style => {
@@ -69,13 +91,35 @@ export async function POST(req: NextRequest) {
           right:{style:'thin', color: {argb:'FFDDDDDD'}}
         };
 
+        const getGroupColor = (groupName: string) => {
+            if (!groupName) return 'FFFFF5EE';
+            const baseGroupName = groupName.replace(/[0-9\s_]+$/, '');
+            const pastelColors = [
+                'FFFFE4E1', 'FFE6E6FA', 'FFF0FFF0', 'FFFFFACD',
+                'FFF0F8FF', 'FFFFF0F5', 'FFE0FFFF', 'FFF5DEB3',
+                'FFD3FFCE', 'FFFFDAB9', 'FFE0B0FF', 'FFF5FFFA'
+            ];
+            let hash = 0;
+            for (let i = 0; i < baseGroupName.length; i++) {
+                hash = baseGroupName.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            return pastelColors[Math.abs(hash) % pastelColors.length];
+        };
+
         if (style.isCollision) {
           cell.fill = {
             type: 'pattern',
             pattern: 'solid',
-            fgColor: { argb: 'FFFFC7CE' } // Light red
+            fgColor: { argb: 'FFFFCCCC' } // Light red background
           };
-          cell.font = { color: { argb: 'FF9C0006' }, bold: true }; // Dark red text
+          cell.font = { color: { argb: 'FFFF0000' }, bold: true }; // Red text
+        } else if (style.group) {
+          const color = getGroupColor(style.group);
+          cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: color }
+          };
         }
       });
     }

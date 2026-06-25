@@ -110,8 +110,8 @@ export async function POST(req: NextRequest) {
              cell.border = { top: {style:'thin'}, bottom:{style:'thin'}, left:{style:'thin'}, right:{style:'thin'} };
              
              if (grid[p][d] && grid[p][d].isCollision) {
-                 cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFC7CE' } };
-                 cell.font = { color: { argb: 'FF9C0006' }, bold: true };
+                 cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFCCCC' } };
+                 cell.font = { color: { argb: 'FFFF0000' }, bold: true };
              }
           }
           currentRow++;
