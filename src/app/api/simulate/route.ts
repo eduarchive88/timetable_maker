@@ -59,15 +59,20 @@ export async function POST(req: NextRequest) {
 
     const response = await new Promise<NextResponse>((resolve) => {
       execFile(
-        'python',
+        'python3',
         [scriptPath, inputJsonPath],
-        { maxBuffer: 1024 * 1024 * 20, timeout: 180000 },  // 3분 타임아웃
+        {
+          maxBuffer: 1024 * 1024 * 20,
+          timeout: 180000,
+          cwd: process.cwd(),
+          env: { ...process.env, PYTHONPATH: process.cwd(), PYTHONIOENCODING: 'utf-8' }
+        },
         (error, stdout, stderr) => {
           if (error && !stdout) {
-            console.error('Simulate Error:', error);
+            console.error('Simulate Error:', error, 'stderr:', stderr);
             resolve(NextResponse.json({
               status: 'error',
-              message: '시뮬레이션 실패: ' + (error.message || stderr)
+              message: '시뮬레이션 실패: ' + stderr || error.message
             }));
             return;
           }
