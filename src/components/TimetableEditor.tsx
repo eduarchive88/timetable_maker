@@ -368,18 +368,25 @@ export default function TimetableEditor({
               ? `[이동${first.group || ''}] ${first.subject} (${first.teacher})`
               : `${first.subject} (${first.teacher})`;
           } else if (viewMode === 'moving_groups') {
-            // Get unique subjects to show
             const subjects = Array.from(new Set(items.map(i => i.subject))).join(', ');
             title = `[이동${first.group || ''}] ${first.grade}학년\n(${subjects})`;
           } else {
             // all_teachers
-            title = first.type === 'moving_group' 
-              ? `[이동${first.group || ''}] ${first.grade}학년 ${first.subject}` 
+            title = first.type === 'moving_group'
+              ? `[이동${first.group || ''}] ${first.grade}학년 ${first.subject}`
               : `${first.grade}-${first.class_col} ${first.subject}`;
           }
 
+          // moving_groups 모드: 과목 수에 따라 폰트 크기 축소
+          const movingFontSize = viewMode === 'moving_groups'
+            ? title.length > 80 ? '0.6rem'
+            : title.length > 50 ? '0.68rem'
+            : title.length > 30 ? '0.75rem'
+            : '0.82rem'
+            : undefined;
+
           return (
-            <div 
+            <div
               key={first.blockId}
               draggable={!isFixed}
               onDragStart={(e) => handleDragStart(e, first.blockId!, day, period, first.type)}
@@ -392,7 +399,7 @@ export default function TimetableEditor({
                 cursor: isFixed ? 'not-allowed' : 'grab'
               }}
             >
-              <div className="block-title">{title}</div>
+              <div className="block-title" style={movingFontSize ? { fontSize: movingFontSize, lineHeight: '1.3' } : undefined}>{title}</div>
               {isConflict && (
                 <div 
                   className="conflict-badge" 
@@ -623,50 +630,53 @@ export default function TimetableEditor({
             ))}
           </div>
         ) : viewMode === 'moving_groups' && selectedGrade === 'all' ? (
-          <div style={{ 
-            display: 'flex', 
-            gap: '2rem', 
-            overflowX: 'auto', 
-            paddingBottom: '1rem', 
-            width: '95vw', 
-            marginLeft: 'calc(-47.5vw + 50%)',
-            padding: '0 1rem'
-          }}>
-            {['2', '3'].map(g => (
-              <div key={g} style={{ flex: '1 0 800px', maxWidth: '100%' }}>
-                <h3 style={{ textAlign: 'center', marginBottom: '1rem', color: g === '2' ? '#60a5fa' : '#34d399' }}>{g}학년 이동그룹 시간표</h3>
-                <div className="timetable-grid normal-grid">
-                  <div className="grid-header-row">
-                    <div className="grid-corner"></div>
+          <div style={{ overflowX: 'auto', width: '95vw', marginLeft: 'calc(-47.5vw + 50%)', padding: '0 1rem 1rem' }}>
+            {/* 두 학년 헤더 */}
+            <div style={{ display: 'flex', alignItems: 'stretch' }}>
+              <div style={{ width: '80px', flexShrink: 0 }} />
+              {['2', '3'].map((g, gIdx) => (
+                <div key={g} style={{ flex: 1, minWidth: 0, borderLeft: gIdx > 0 ? '3px solid var(--border)' : 'none' }}>
+                  <h3 style={{ textAlign: 'center', margin: '0 0 0.5rem', padding: '0.5rem 0', color: g === '2' ? '#60a5fa' : '#34d399', fontSize: '1rem' }}>
+                    {g}학년 이동그룹
+                  </h3>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', borderBottom: '2px solid var(--border)' }}>
                     {DAYS.map(day => (
-                      <div key={day} className="grid-header-cell">{day}</div>
+                      <div key={day} className="grid-header-cell" style={{ textAlign: 'center' }}>{day}</div>
                     ))}
                   </div>
-                  {Array.from({ length: maxPeriods }).map((_, pIdx) => {
-                    const period = pIdx + 1;
-                    return (
-                      <div key={period} className="grid-row">
-                        <div className="grid-time-cell">{period}교시</div>
-                        {DAYS.map(day => {
-                          const isValidPeriod = period <= periods[day];
-                          const isDragOver = dragOverCell?.day === day && dragOverCell?.period === period;
-                          return (
-                            <div 
-                              key={day} 
-                              className={`grid-cell ${!isValidPeriod ? 'disabled' : ''} ${isDragOver ? 'drag-over' : ''}`}
-                              onDragOver={(e) => isValidPeriod ? handleDragOver(e, day, period) : e.preventDefault()}
-                              onDrop={(e) => isValidPeriod ? handleDrop(e, day, period) : e.preventDefault()}
-                            >
-                              {isValidPeriod && renderCellContent(day, period, undefined, g)}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    );
-                  })}
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
+            {/* 교시별 동기화 행: 같은 div 안에 두 학년을 나란히 → 행 높이 자동 동기화 */}
+            {Array.from({ length: maxPeriods }).map((_, pIdx) => {
+              const period = pIdx + 1;
+              return (
+                <div key={period} style={{ display: 'flex', alignItems: 'stretch', borderBottom: '1px solid var(--border)' }}>
+                  <div className="grid-time-cell" style={{ width: '80px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {period}교시
+                  </div>
+                  {['2', '3'].map((g, gIdx) => (
+                    <div key={g} style={{ flex: 1, minWidth: 0, display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', borderLeft: gIdx > 0 ? '3px solid var(--border)' : 'none' }}>
+                      {DAYS.map(day => {
+                        const isValidPeriod = period <= periods[day];
+                        const isDragOver = dragOverCell?.day === day && dragOverCell?.period === period;
+                        return (
+                          <div
+                            key={day}
+                            className={`grid-cell ${!isValidPeriod ? 'disabled' : ''} ${isDragOver ? 'drag-over' : ''}`}
+                            style={{ minHeight: '80px' }}
+                            onDragOver={(e) => isValidPeriod ? handleDragOver(e, day, period) : e.preventDefault()}
+                            onDrop={(e) => isValidPeriod ? handleDrop(e, day, period) : e.preventDefault()}
+                          >
+                            {isValidPeriod && renderCellContent(day, period, undefined, g)}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
           </div>
         ) : (
           <div className="timetable-grid normal-grid">
