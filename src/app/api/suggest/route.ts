@@ -51,10 +51,14 @@ export async function POST(req: NextRequest) {
     const scriptPath = path.join(process.cwd(), 'suggest_swaps.py');
     
     return new Promise<NextResponse>((resolve) => {
-      execFile('python', [scriptPath, inputJsonPath], { maxBuffer: 1024 * 1024 * 10 }, (error, stdout, stderr) => {
+      execFile('python3', [scriptPath, inputJsonPath], {
+        maxBuffer: 1024 * 1024 * 10,
+        cwd: process.cwd(),
+        env: { ...process.env, PYTHONPATH: process.cwd(), PYTHONIOENCODING: 'utf-8' }
+      }, (error, stdout, stderr) => {
         if (error && !stdout) {
-          console.error("Python Execution Error:", error);
-          resolve(NextResponse.json({ status: 'error', message: 'Python 스크립트 실행 실패: ' + (error.message || stderr) }));
+          console.error("Python Execution Error:", error, 'stderr:', stderr);
+          resolve(NextResponse.json({ status: 'error', message: 'Python 스크립트 실행 실패: ' + (stderr || error.message) }));
           return;
         }
         
