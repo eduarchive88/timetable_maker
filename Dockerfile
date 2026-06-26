@@ -11,13 +11,13 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# Skip playwright browser download and prisma auto-generate during npm ci
+# Skip playwright browser download and prisma auto-generate during npm install
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 ENV PRISMA_SKIP_POSTINSTALL_GENERATE=true
 
-# Install Node modules
+# Install Node modules (use npm install instead of npm ci to handle lock file drift)
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm install
 
 # Setup Python virtual environment
 RUN python3 -m venv /opt/venv
