@@ -394,8 +394,8 @@ export default function Home() {
     if (!result || !result.schedule) return;
     
     const classList = result.classes || previewData?.classes || 
-      Array.from(new Set(result.schedule.filter(s => s.grade && s.class_col).map(s => `${s.grade}-${s.class_col}`)))
-        .map(str => {
+      Array.from(new Set(result.schedule.filter((s: any) => s.grade && s.class_col).map((s: any) => `${s.grade}-${s.class_col}`)))
+        .map((str: any) => {
           const [g, c] = str.split('-');
           return { grade: parseInt(g), class_col: c };
         });
