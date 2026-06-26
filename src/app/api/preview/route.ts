@@ -65,9 +65,10 @@ export async function POST(req: NextRequest) {
     const pythonScript = path.join(process.cwd(), 'solver.py');
     
     try {
-      const { stdout, stderr } = await execFileAsync('python', [pythonScript, inputJson], {
+      const { stdout, stderr } = await execFileAsync('python3', [pythonScript, inputJson], {
         maxBuffer: 1024 * 1024 * 10,
-        env: { ...process.env, PYTHONIOENCODING: 'utf-8' }
+        cwd: process.cwd(),
+        env: { ...process.env, PYTHONPATH: process.cwd(), PYTHONIOENCODING: 'utf-8' }
       });
       
       const result = JSON.parse(stdout);
