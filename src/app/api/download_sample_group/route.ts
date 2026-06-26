@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
       status: 200,
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'Content-Disposition': 'attachment; filename="sample_moving_groups.xlsx"',
+        'Content-Disposition': 'attachment; filename*=UTF-8\'\'%EC%9D%B4%EB%8F%99%EA%B7%B8%EB%A3%B9%EC%83%98%ED%94%8C.xlsx',
       },
     });
   } catch (error: any) {
